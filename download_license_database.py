@@ -2,6 +2,10 @@ import os
 import zipfile
 import urllib.request
 import shutil
+from colorama import init, Fore, Style
+
+# Initialize Colorama
+init(autoreset=True)
 
 # Define URLs and paths
 url = 'ftp://wirelessftp.fcc.gov/pub/uls/complete/l_amat.zip'
@@ -37,27 +41,103 @@ def cleanup(files_and_dirs):
         elif os.path.isdir(path):
             shutil.rmtree(path)
 
+# Function to search for a call sign in the file
+def search_call_sign_in_file(call_sign):
+    results = []
+    if os.path.exists(en_dat_file_name):
+        with open(en_dat_file_name, 'r') as file:
+            for line in file:
+                parts = line.strip().split('|')
+                if len(parts) > 20 and call_sign in parts[4]:
+                    callsign = parts[4]
+                    name = parts[7] if len(parts) > 7 else 'N/A'
+                    first_name = parts[8] if len(parts) > 8 else ''
+                    last_name = parts[10] if len(parts) > 10 else ''
+                    address = f"{parts[14]}, {parts[15]}, {parts[16]}, {parts[17]}" if len(parts) > 17 else 'N/A'
+                    license_number = parts[6] if len(parts) > 6 else 'N/A'
+                    frn = parts[22] if len(parts) > 22 else ''
+                    full_name = f"{first_name} {last_name}".strip() if first_name or last_name else name
+                    results.append((callsign, full_name, address, license_number, frn))
+    return results
+
+# Function to display results with color
+def display_results(results):
+    formatted_results = []
+    for result in results:
+        formatted_result = f"""
+{Fore.GREEN + Style.BRIGHT}Call Sign:         {Fore.RESET}{result[0]}
+{Fore.BLUE + Style.BRIGHT}Name:              {Fore.RESET}{result[1]}
+{Fore.CYAN + Style.BRIGHT}Address:          {Fore.RESET}{result[2]}
+{Fore.MAGENTA + Style.BRIGHT}License Number:    {Fore.RESET}{result[3]}
+{Fore.YELLOW + Style.BRIGHT}FRN:               {Fore.RESET}{result[4]}
+        """
+        formatted_results.append(formatted_result.strip())
+    return '\n\n'.join(formatted_results)
+
+# Function to clear the screen
+def clear_screen():
+    os.system('cls' if os.name == 'nt' else 'clear')
+
 # Main script logic
+def main():
+    clear_screen()
+    if os.path.exists(en_dat_file_name):
+        print(f"{Fore.GREEN}The {en_dat_file_name} file already exists.")
+        download_choice = input(f"{Fore.CYAN}Do you want to download it again? (y/n): ")
+        if download_choice.lower() == 'y':
+            clear_screen()
+            print(f"{Fore.YELLOW}Downloading the ZIP file...")
+            download_file(url, zip_file_name)
+
+            clear_screen()
+            print(f"{Fore.YELLOW}Unzipping the file...")
+            os.makedirs(extract_dir, exist_ok=True)
+            unzip_file(zip_file_name, extract_dir)
+
+            clear_screen()
+            print(f"{Fore.YELLOW}Moving EN.dat file...")
+            move_en_dat_file(extract_dir, '.')
+
+            clear_screen()
+            print(f"{Fore.YELLOW}Cleaning up...")
+            cleanup([zip_file_name, extract_dir])
+        else:
+            clear_screen()
+            print(f"{Fore.GREEN}Using the existing {en_dat_file_name} file.")
+    else:
+        clear_screen()
+        print(f"{Fore.CYAN}This will download the database in the same directory that this app is run in.")
+        input(f"{Fore.GREEN}Welcome to the FCC database downloader for HAMs. Press ENTER to start download:")
+        clear_screen()
+        print(f"{Fore.YELLOW}Downloading the ZIP file...")
+        download_file(url, zip_file_name)
+
+        clear_screen()
+        print(f"{Fore.YELLOW}Unzipping the file...")
+        os.makedirs(extract_dir, exist_ok=True)
+        unzip_file(zip_file_name, extract_dir)
+
+        clear_screen()
+        print(f"{Fore.YELLOW}Moving EN.dat file...")
+        move_en_dat_file(extract_dir, '.')
+
+        clear_screen()
+        print(f"{Fore.YELLOW}Cleaning up...")
+        cleanup([zip_file_name, extract_dir])
+
+    clear_screen()
+    print(f"{Fore.GREEN}Setup complete.")
+
+    while True:
+        call_sign = input(f"{Fore.GREEN}Enter a call sign to search (or type 'exit' to quit): ")
+        if call_sign.lower() == 'exit':
+            break
+        clear_screen()
+        results = search_call_sign_in_file(call_sign)
+        if results:
+            print(display_results(results))
+        else:
+            print(f"{Fore.RED}No results found for call sign: {call_sign}")
+
 if __name__ == "__main__":
-    # Download the ZIP file
-    print("This will download the database in the same directory that this app is run in. ")
-    input("Welcome the FCC database downloader for HAMS. Press ENTER to start download:")
-    print("Downloading the ZIP file...")
-    download_file(url, zip_file_name)
-
-    # Unzip the file
-    print("Unzipping the file...")
-    os.makedirs(extract_dir, exist_ok=True)
-    unzip_file(zip_file_name, extract_dir)
-
-    # Move the EN.dat file
-    print("Moving EN.dat file...")
-    move_en_dat_file(extract_dir, '.')
-
-    # Clean up
-    print("Cleaning up...")
-    cleanup([zip_file_name, extract_dir])
-
-    print("Done.")
-
-    input("Press enter to EXIT... ")
+    main()
